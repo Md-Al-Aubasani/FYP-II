@@ -26,8 +26,7 @@ from langchain_community.document_loaders import PyPDFLoader
 import os
 import tempfile
 
-api_key = "api_key"
-
+api_key = "your_api_key"
 
 ### Contextualize question ###
 contextualize_q_system_prompt = (
