@@ -7,9 +7,10 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import create_retrieval_chain
 
-from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain.chains import create_history_aware_retriever
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage, HumanMessage
 
 
 
@@ -26,7 +27,7 @@ from langchain_community.document_loaders import PyPDFLoader
 import os
 import tempfile
 
-api_key = "your_api_key"
+api_key = "YOUR_API_KEY"
 
 ### Contextualize question ###
 contextualize_q_system_prompt = (
@@ -73,7 +74,12 @@ def conversation_chat(query, chain, history, user_vector_store):
     docs_and_scores = user_vector_store.similarity_search_with_score(query)
     user_info = [doc.page_content for doc, score in docs_and_scores]
     result = chain.invoke({"input": query, "chat_history": history, "user_info": user_info})
-    history.append((query, result["answer"]))
+    history.extend(
+      [
+        HumanMessage(content=query),
+        AIMessage(content=result["answer"]),
+      ]
+    )
     return result["answer"]
 
 def display_chat_history(chain, user_vector_store):
