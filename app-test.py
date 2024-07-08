@@ -8,6 +8,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains import create_retrieval_chain
 
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+from langchain.chains import create_history_aware_retriever
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
 
 
 
@@ -26,7 +29,16 @@ import tempfile
 api_key = "api_key"
 
 
-prompt = ChatPromptTemplate.from_template("""
+### Contextualize question ###
+contextualize_q_system_prompt = (
+    "Given a chat history and the latest user question "
+    "which might reference context in the chat history, "
+    "formulate a standalone question which can be understood "
+    "without the chat history. Do NOT answer the question, "
+    "just reformulate it if needed and otherwise return it as is."
+)
+
+system_prompt = """
 You are a helpful, respectful and honest medical bot. Always answer as
 helpfully as possible, while being safe.
 
@@ -40,12 +52,11 @@ Answer the following question based only on the user info:
 {user_info}
 </user_info>
 
-You can look at the context to see if it is relevant and can help the medical suggestion you're making.
+You can look at the medical context to see if it is relevant and see if it can help the medical suggestion you're making.
 <context>
 {context}
 </context>
-
-Question: {input}""")
+"""
 
 
 def initialize_session_state():
@@ -62,7 +73,7 @@ def conversation_chat(query, chain, history, user_vector_store):
     # retrieving releavant user context
     docs_and_scores = user_vector_store.similarity_search_with_score(query)
     user_info = [doc.page_content for doc, score in docs_and_scores]
-    result = chain.invoke({"question": query, "chat_history": history, 'user_info': user_info})
+    result = chain.invoke({"input": query, "chat_history": history, "user_info": user_info})
     history.append((query, result["answer"]))
     return result["answer"]
 
@@ -92,14 +103,7 @@ def create_conversational_chain(vector_db):
     # Create llm
     model = ChatMistralAI(mistral_api_key=api_key)
 
-    ### Contextualize question ###
-    contextualize_q_system_prompt = (
-        "Given a chat history and the latest user question "
-        "which might reference context in the chat history, "
-        "formulate a standalone question which can be understood "
-        "without the chat history. Do NOT answer the question, "
-        "just reformulate it if needed and otherwise return it as is."
-    )
+    
     contextualize_q_prompt = ChatPromptTemplate.from_messages(
         [
             ("system", contextualize_q_system_prompt),
@@ -108,30 +112,9 @@ def create_conversational_chain(vector_db):
         ]
     )
     history_aware_retriever = create_history_aware_retriever(
-        model, retriever = vector_db.as_retriever(search_kwargs={"k": 2}, contextualize_q_prompt
+        model, vector_db.as_retriever(search_kwargs={"k": 2}), contextualize_q_prompt
     )
     
-    
-    
-    system_prompt = """
-    You are a helpful, respectful and honest medical bot. Always answer as
-    helpfully as possible, while being safe.
-    
-    If a question does not make any sense, or is not factually coherent, explain
-    why instead of answering something not correct. If you don't know the answer
-    to a question, please don't share false information.
-    
-    Answer the following question based only on the user info:
-    
-    <user_info>
-    {user_info}
-    </user_info>
-    
-    You can look at the medical context to see if it is relevant and see if it can help the medical suggestion you're making.
-    <context>
-    {context}
-    </context>
-    """
     
     qa_prompt = ChatPromptTemplate.from_messages(
         [
