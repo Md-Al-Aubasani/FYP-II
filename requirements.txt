@@ -1,0 +1,16 @@
+langchain
+torch
+accelerate
+sentence_transformers
+streamlit_chat
+streamlit
+faiss-cpu
+faiss-gpu
+tiktoken
+huggingface-hub
+langchain-mistralai
+langchain-community
+mistralai
+llama-index
+unstructured
+jq
